@@ -6,6 +6,7 @@ on:
 
 jobs:
   build-and-push:
+    # Bước build vẫn dùng máy chủ của GitHub để tiết kiệm tài nguyên cho server nhà bạn
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,35 +23,29 @@ jobs:
         with:
           context: .
           push: true
-          # Tên image sẽ là: congminhdevlxag/labet-backend:latest
           tags: ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
 
   deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    # SỬA TẠI ĐÂY: Dùng runner bạn vừa cài trên Ubuntu Proxmox
+    runs-on: self-hosted
     steps:
-      - name: Deploy to Server via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: |
-            # 1. Tải bản image mới nhất từ Docker Hub về server
-            docker pull ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
+      - name: Pull and Run Container
+        run: |
+          # 1. Tải bản image mới nhất từ Docker Hub về chính máy này
+          docker pull ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
 
-            # 2. Dừng và xóa container cũ nếu đang chạy (để tránh trùng tên/cổng)
-            docker stop labet-app || true
-            docker rm labet-app || true
+          # 2. Dừng và xóa container cũ nếu đang chạy
+          docker stop labet-app || true
+          docker rm labet-app || true
 
-            # 3. Chạy container mới
-            # -p 8080:8080 (đổi port nếu code Go của bạn dùng port khác)
-            # --add-host cho phép Go kết nối tới Postgres ở bên ngoài container thông qua 'host.docker.internal'
-            docker run -d \
-              --name labet-app \
-              -p 8080:8080 \
-              --add-host=host.docker.internal:host-gateway \
-              ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
+          # 3. Chạy container mới trực tiếp trên server
+          # Sử dụng cổng 8080 và cấu hình kết nối tới Postgres
+          docker run -d \
+            --name labet-app \
+            -p 8080:8080 \
+            --add-host=host.docker.internal:host-gateway \
+            ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
 
-            # 4. Dọn dẹp các image cũ không dùng tới để tiết kiệm dung lượng server
-            docker image prune -f
+          # 4. Dọn dẹp các image cũ để tránh đầy ổ cứng server
+          docker image prune -f
