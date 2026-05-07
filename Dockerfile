@@ -1,36 +1,39 @@
-# --- BƯỚC 1: Build file thực thi ---
+# --- BƯỚC 1: Build file thực thi (Builder) ---
 FROM golang:1.22-alpine AS builder
 
 # Thiết lập thư mục làm việc bên trong container
 WORKDIR /app
 
-# Copy các file quản lý thư viện trước để tận dụng cache của Docker
-COPY go.mod go.sum ./
-RUN go mod download
+# Chỉ copy file quản lý thư viện trước
+COPY go.mod ./
+
+# Nếu bạn có file go.sum thì bỏ comment dòng dưới, 
+# nhưng nếu đang lỗi thì cứ để yên thế này cho chắc.
+# COPY go.sum ./
 
 # Copy toàn bộ mã nguồn vào container
 COPY . .
 
-# Build code Go thành file thực thi tên là "app"
-# CGO_ENABLED=0 giúp chạy tốt trên các hệ điều hành Linux nhẹ như Alpine
+# Tải các thư viện cần thiết và build code Go thành file thực thi tên là "main"
+# Lệnh build sẽ tự động tải các package còn thiếu
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/main .
 
-# --- BƯỚC 2: Tạo Image chạy cuối cùng ---
+# --- BƯỚC 2: Tạo Image chạy cuối cùng (Runtime) ---
 FROM alpine:latest
 
-# Cài đặt ca-certificates để có thể gọi các API HTTPS (nếu cần)
+# Cài đặt ca-certificates để ứng dụng có thể gọi API HTTPS (nếu cần)
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Chỉ lấy duy nhất file thực thi từ bước builder qua đây
+# Chỉ lấy duy nhất file thực thi từ bước builder sang đây
 COPY --from=builder /app/main .
 
-# Nếu bạn có file .env, hãy bỏ comment dòng dưới đây
+# Nếu code của bạn dùng file .env, hãy bỏ dấu # ở dòng dưới
 # COPY .env .
 
-# Mở port (thay 8080 bằng port mà code Go của bạn đang lắng nghe)
+# Mở port (8080 là cổng mặc định của bạn)
 EXPOSE 8080
 
-# Lệnh chạy ứng dụng
+# Lệnh khởi chạy ứng dụng
 CMD ["./main"]
