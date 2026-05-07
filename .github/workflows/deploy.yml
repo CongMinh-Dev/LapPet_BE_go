@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-and-push:
-    # Bước build vẫn dùng máy chủ của GitHub để tiết kiệm tài nguyên cho server nhà bạn
+    # Giai đoạn build vẫn sử dụng máy chủ của GitHub để tiết kiệm tài nguyên cho server Proxmox
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,25 +27,26 @@ jobs:
 
   deploy:
     needs: build-and-push
-    # SỬA TẠI ĐÂY: Dùng runner bạn vừa cài trên Ubuntu Proxmox
+    # SỬA TẠI ĐÂY: Sử dụng runner bạn đã cài đặt trên Ubuntu Proxmox
     runs-on: self-hosted
     steps:
       - name: Pull and Run Container
         run: |
-          # 1. Tải bản image mới nhất từ Docker Hub về chính máy này
+          # 1. Tải bản image mới nhất từ Docker Hub về chính máy Proxmox của bạn
           docker pull ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
 
-          # 2. Dừng và xóa container cũ nếu đang chạy
+          # 2. Dừng và xóa container cũ nếu đang chạy để tránh xung đột cổng/tên
           docker stop labet-app || true
           docker rm labet-app || true
 
           # 3. Chạy container mới trực tiếp trên server
-          # Sử dụng cổng 8080 và cấu hình kết nối tới Postgres
+          # Thêm tham số --restart always để container tự khởi động cùng máy chủ
           docker run -d \
             --name labet-app \
+            --restart always \
             -p 8080:8080 \
             --add-host=host.docker.internal:host-gateway \
             ${{ secrets.DOCKER_USERNAME }}/labet-backend:latest
 
-          # 4. Dọn dẹp các image cũ để tránh đầy ổ cứng server
+          # 4. Dọn dẹp các image cũ để tối ưu dung lượng ổ cứng cho server
           docker image prune -f
