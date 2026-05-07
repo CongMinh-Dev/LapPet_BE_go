@@ -1,5 +1,5 @@
 # --- BƯỚC 1: Build file thực thi (Builder) ---
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Thiết lập thư mục làm việc bên trong container
 WORKDIR /app
